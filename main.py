@@ -30,7 +30,7 @@ def home():
     return "Botul este online!"
 
 if __name__ == "__main__":
-    ENV = os.environ.get("ENV", "local")  # local sau prod
+    ENV = os.environ.get("ENV", "prod")  # local sau prod
     if ENV == "prod":
         # Setează webhook-ul (modifică <adresa-ta-publica> cu domeniul/serverul tău)
         WEBHOOK_URL = os.environ.get("WEBHOOK_URL", f"https://<adresa-ta-publica>/{TOKEN}")
