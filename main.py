@@ -33,7 +33,7 @@ if __name__ == "__main__":
     ENV = os.environ.get("ENV", "prod")  # local sau prod
     if ENV == "prod":
         # Setează webhook-ul (modifică <adresa-ta-publica> cu domeniul/serverul tău)
-        WEBHOOK_URL = os.environ.get("WEBHOOK_URL", f"https://<adresa-ta-publica>/{TOKEN}")
+        WEBHOOK_URL = os.environ.get("WEBHOOK_URL", f"https://render-bot-test-eq72.onrender.com/{TOKEN}")
         bot.remove_webhook()
         bot.set_webhook(url=WEBHOOK_URL)
         port = int(os.environ.get('PORT', 5000))
