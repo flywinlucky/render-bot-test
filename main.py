@@ -8,7 +8,7 @@ TOKEN = os.getenv("BOT_TOKEN")  # Setează-l în Render ca environment variable
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
 @app.route('/')
-def home():
+def home(): 
     return "Bot is running!"
 
 @app.route(f'/webhook/{TOKEN}', methods=['POST'])
