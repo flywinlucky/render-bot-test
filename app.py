@@ -2,8 +2,6 @@ from flask import Flask, request
 import requests
 import os
 import sqlite3
-import threading
-import time
 
 app = Flask(__name__)
 
@@ -44,19 +42,6 @@ def remove_chat(chat_id):
     conn.commit()
     conn.close()
 
-def send_auto_messages():
-    msg_count = 1
-    while True:
-        chats = load_chats()
-        for chat_id in chats:
-            payload = {
-                "chat_id": chat_id,
-                "text": f"Automat mesaj {msg_count}"
-            }
-            requests.post(TELEGRAM_API_URL, json=payload)
-        msg_count += 1
-        time.sleep(5)
-
 @app.route('/')
 def home():
     return "Bot is running!"
@@ -82,7 +67,18 @@ def webhook():
         requests.post(TELEGRAM_API_URL, json=payload)
     return "ok", 200
 
+@app.route('/spam')
+def spam():
+    msg_count = int(request.args.get("count", 1))
+    chats = load_chats()
+    for chat_id in chats:
+        payload = {
+            "chat_id": chat_id,
+            "text": f"Automat mesaj {msg_count}"
+        }
+        requests.post(TELEGRAM_API_URL, json=payload)
+    return f"Sent spam message {msg_count} to {len(chats)} users.", 200
+
 if __name__ == "__main__":
     init_db()
-    threading.Thread(target=send_auto_messages, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
