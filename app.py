@@ -1,42 +1,48 @@
-import requests
-import time
-import threading
-import json
-import os
 from flask import Flask, request
-
-TOKEN = "8398943601:AAEzb3okZXiN6QRVgfsYk3e6dMCB-ybBlcY"
-TELEGRAM_API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-CHATS_FILE = "active_chats.json"
+import requests
+import os
+import sqlite3
+import threading
+import time
 
 app = Flask(__name__)
 
+TOKEN = os.getenv("BOT_TOKEN")
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+DB_FILE = "active_chats.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS chats (
+            chat_id INTEGER PRIMARY KEY
+        )
+    """)
+    conn.commit()
+    conn.close()
+
 def load_chats():
-    if os.path.exists(CHATS_FILE):
-        with open(CHATS_FILE, "r") as f:
-            return set(json.load(f))
-    return set()
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT chat_id FROM chats")
+    rows = c.fetchall()
+    conn.close()
+    return set(row[0] for row in rows)
 
-def save_chats(chats):
-    with open(CHATS_FILE, "w") as f:
-        json.dump(list(chats), f)
+def add_chat(chat_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("INSERT OR IGNORE INTO chats (chat_id) VALUES (?)", (chat_id,))
+    conn.commit()
+    conn.close()
 
-active_chats = load_chats()
-
-def process_message(message):
-    chat_id = message["chat"]["id"]
-    text = message.get("text", "")
-    if text.lower() == "/start":
-        active_chats.add(chat_id)
-        save_chats(active_chats)
-        reply = "Ai pornit notificările automate! Vei primi mesaje la fiecare minut."
-    else:
-        reply = f"You said: {text}"
-    payload = {
-        "chat_id": chat_id,
-        "text": reply
-    }
-    requests.post(TELEGRAM_API_URL, json=payload)
+def remove_chat(chat_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("DELETE FROM chats WHERE chat_id = ?", (chat_id,))
+    conn.commit()
+    conn.close()
 
 def send_auto_messages():
     msg_count = 1
@@ -51,11 +57,6 @@ def send_auto_messages():
         msg_count += 1
         time.sleep(5)
 
-def delete_webhook():
-    url = f"https://api.telegram.org/bot{TOKEN}/deleteWebhook"
-    resp = requests.get(url)
-    print("Webhook delete response:", resp.text)
-
 @app.route('/')
 def home():
     return "Bot is running!"
@@ -64,37 +65,24 @@ def home():
 def webhook():
     data = request.get_json()
     if "message" in data:
-        process_message(data["message"])
+        chat_id = data["message"]["chat"]["id"]
+        text = data["message"].get("text", "")
+        if text.lower() == "/start":
+            add_chat(chat_id)
+            reply = "Ai pornit notificările automate! Vei primi mesaje la fiecare minut."
+        elif text.lower() == "/stop":
+            remove_chat(chat_id)
+            reply = "Ai oprit notificările automate!"
+        else:
+            reply = f"You said: {text}"
+        payload = {
+            "chat_id": chat_id,
+            "text": reply
+        }
+        requests.post(TELEGRAM_API_URL, json=payload)
     return "ok", 200
 
-def run_local_bot():
-    delete_webhook()
-    threading.Thread(target=send_auto_messages, daemon=True).start()
-    TELEGRAM_GET_UPDATES_URL = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
-    last_update_id = None
-    print("Local bot polling started.")
-    while True:
-        params = {"timeout": 5}
-        if last_update_id:
-            params["offset"] = last_update_id + 1
-        try:
-            resp = requests.get(TELEGRAM_GET_UPDATES_URL, params=params)
-            if resp.status_code == 200:
-                updates = resp.json().get("result", [])
-                for update in updates:
-                    if "message" in update:
-                        process_message(update["message"])
-                    last_update_id = update["update_id"]
-            else:
-                print("Error:", resp.text)
-        except Exception as e:
-            print("Exception:", e)
-        time.sleep(1)
-
 if __name__ == "__main__":
-    import sys
+    init_db()
     threading.Thread(target=send_auto_messages, daemon=True).start()
-    if len(sys.argv) > 1 and sys.argv[1] == "local":
-        run_local_bot()
-    else:
-        app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
