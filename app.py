@@ -21,6 +21,7 @@ def init_db():
     conn.close()
 
 def load_chats():
+    init_db()
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("SELECT chat_id FROM chats")
@@ -29,6 +30,7 @@ def load_chats():
     return set(row[0] for row in rows)
 
 def add_chat(chat_id):
+    init_db()
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("INSERT OR IGNORE INTO chats (chat_id) VALUES (?)", (chat_id,))
@@ -36,6 +38,7 @@ def add_chat(chat_id):
     conn.close()
 
 def remove_chat(chat_id):
+    init_db()
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("DELETE FROM chats WHERE chat_id = ?", (chat_id,))
@@ -44,10 +47,12 @@ def remove_chat(chat_id):
 
 @app.route('/')
 def home():
+    init_db()
     return "Bot is running!"
 
 @app.route(f'/webhook/{TOKEN}', methods=['POST'])
 def webhook():
+    init_db()
     data = request.get_json()
     if "message" in data:
         chat_id = data["message"]["chat"]["id"]
@@ -69,6 +74,7 @@ def webhook():
 
 @app.route('/spam')
 def spam():
+    init_db()
     msg_count = int(request.args.get("count", 1))
     chats = load_chats()
     for chat_id in chats:
@@ -80,5 +86,4 @@ def spam():
     return f"Sent spam message {msg_count} to {len(chats)} users.", 200
 
 if __name__ == "__main__":
-    init_db()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
