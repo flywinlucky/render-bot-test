@@ -30,6 +30,9 @@ MESAJE = [
 # Astfel, ordinea va fi aleatorie, dar se va păstra pe parcursul unui ciclu.
 random.shuffle(MESAJE)
 
+# Contor global pentru a urmări ce mesaj a fost trimis
+spam_counter = 0
+
 
 # --- FUNCȚII BAZĂ DE DATE ---
 def init_db():
@@ -106,15 +109,17 @@ def webhook():
 
 @app.route('/spam')
 def spam():
-    """Trimite un mesaj tuturor utilizatorilor activi."""
+    """Trimite un mesaj tuturor utilizatorilor activi, în mod ciclic."""
+    global spam_counter
     init_db()
-    msg_count = int(request.args.get("count", 1))
     
-    # Selectează un mesaj din lista amestecată folosind contorul
-    # Operatorul modulo (%) asigură că indexul rămâne în limitele listei (0-9)
-    # Astfel, pentru count=1, index=0; count=10, index=9; count=11, index=0.
-    mesaj_index = (msg_count - 1) % len(MESAJE)
+    # Selectează un mesaj din lista amestecată folosind contorul global
+    # Operatorul modulo (%) asigură că indexul rămâne în limitele listei.
+    mesaj_index = spam_counter % len(MESAJE)
     mesaj_de_trimis = MESAJE[mesaj_index]
+    
+    # Incrementăm contorul pentru următoarea cerere
+    spam_counter += 1
     
     chats = load_chats()
     for chat_id in chats:
@@ -124,7 +129,8 @@ def spam():
         }
         requests.post(TELEGRAM_API_URL, json=payload)
         
-    return f"Sent message '{mesaj_de_trimis}' (cycle count {msg_count}) to {len(chats)} users.", 200
+    return f"Sent message '{mesaj_de_trimis}' to {len(chats)} users.", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
