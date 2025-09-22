@@ -4,16 +4,19 @@ import os
 import random
 import json
 import psycopg2
-from psycopg2 import sql
+import sys
 
 app = Flask(__name__)
 
-# --- CONFIGURARE ---
-# Citim variabilele de mediu
+# --- CONFIGURARE ȘI VERIFICARE ---
 TOKEN = os.getenv("BOT_TOKEN")
-DATABASE_URL = os.getenv("DATABASE_URL") # Variabilă nouă pentru baza de date PostgreSQL
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Construim URL-urile pentru API-ul Telegram
+# Verificăm dacă variabilele esențiale sunt setate
+if not TOKEN or not DATABASE_URL:
+    print("EROARE CRITICĂ: Asigură-te că variabilele de mediu BOT_TOKEN și DATABASE_URL sunt setate.")
+    sys.exit(1)
+
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 TELEGRAM_API_URL_PHOTO = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
 
@@ -23,94 +26,97 @@ def load_messages():
     """Încarcă mesajele din fișierul messages.json."""
     try:
         with open('messages.json', 'r', encoding='utf-8') as f:
-            messages = json.load(f)
-        return messages
-    except FileNotFoundError:
-        print("Eroare: Fișierul 'messages.json' nu a fost găsit.")
-        return []
-    except json.JSONDecodeError:
-        print("Eroare: Fișierul 'messages.json' nu este un JSON valid.")
+            return json.load(f)
+    except Exception as e:
+        print(f"AVERTISMENT: Nu s-a putut încărca 'messages.json'. Eroare: {e}")
         return []
 
 MESAJE = load_messages()
-
-# Amestecăm lista o singură dată la pornirea aplicației
 if MESAJE:
     random.shuffle(MESAJE)
-
-# Contor global pentru a urmări ciclul de mesaje
 spam_counter = 0
 
 
-# --- FUNCȚII BAZĂ DE DATE (MODIFICATE PENTRU POSTGRESQL) ---
+# --- FUNCȚII BAZĂ DE DATE (CU CONEXIUNI ROBUSTE) ---
 def get_db_connection():
-    """Stabilește o conexiune cu baza de date PostgreSQL."""
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+    """Stabilește o conexiune cu baza de date PostgreSQL. Returnează None în caz de eroare."""
+    try:
+        return psycopg2.connect(DATABASE_URL)
+    except psycopg2.OperationalError as e:
+        print(f"EROARE BAZĂ DE DATE: Conexiunea a eșuat. Detalii: {e}")
+        return None
 
 def init_db():
-    """Initializează baza de date și creează tabelul dacă nu există."""
+    """Initializează tabelul în baza de date. Se execută o singură dată la pornirea aplicației."""
     conn = get_db_connection()
-    cur = conn.cursor()
-    # Folosim BIGINT pentru chat_id pentru a fi compatibil cu ID-urile Telegram
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS chats (
-            chat_id BIGINT PRIMARY KEY
-        )
-    """)
-    conn.commit()
-    cur.close()
-    conn.close()
+    if conn is None:
+        print("EROARE BAZĂ DE DATE: Inițializarea a eșuat, conexiune invalidă.")
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chats (
+                    chat_id BIGINT PRIMARY KEY
+                )
+            """)
+        conn.commit()
+        print("BAZĂ DE DATE: Conexiune reușită. Tabelul 'chats' este pregătit.")
+    except Exception as e:
+        print(f"EROARE BAZĂ DE DATE: Crearea tabelului a eșuat. Detalii: {e}")
+    finally:
+        conn.close()
 
 def load_chats():
-    """Încarcă toate ID-urile de chat active din baza de date."""
+    """Încarcă toate ID-urile de chat din baza de date."""
     chats = set()
+    conn = get_db_connection()
+    if conn is None: return chats
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT chat_id FROM chats")
-        rows = cur.fetchall()
-        chats = set(row[0] for row in rows)
-        cur.close()
-        conn.close()
+        with conn.cursor() as cur:
+            cur.execute("SELECT chat_id FROM chats")
+            chats = set(row[0] for row in cur.fetchall())
+        print(f"BAZĂ DE DATE: {len(chats)} utilizatori încărcați.")
     except Exception as e:
-        print(f"Eroare la încărcarea chat-urilor: {e}")
+        print(f"EROARE BAZĂ DE DATE: Încărcarea chat-urilor a eșuat. Detalii: {e}")
+    finally:
+        conn.close()
     return chats
 
 def add_chat(chat_id):
     """Adaugă un nou ID de chat în baza de date."""
+    conn = get_db_connection()
+    if conn is None: return
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        # ON CONFLICT previne erorile dacă chat_id-ul există deja
-        cur.execute("INSERT INTO chats (chat_id) VALUES (%s) ON CONFLICT (chat_id) DO NOTHING", (chat_id,))
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO chats (chat_id) VALUES (%s) ON CONFLICT (chat_id) DO NOTHING", (chat_id,))
         conn.commit()
-        cur.close()
-        conn.close()
+        print(f"BAZĂ DE DATE: Utilizator {chat_id} adăugat.")
     except Exception as e:
-        print(f"Eroare la adăugarea chat-ului: {e}")
+        print(f"EROARE BAZĂ DE DATE: Adăugarea chat-ului {chat_id} a eșuat. Detalii: {e}")
+    finally:
+        conn.close()
 
 def remove_chat(chat_id):
     """Șterge un ID de chat din baza de date."""
+    conn = get_db_connection()
+    if conn is None: return
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM chats WHERE chat_id = %s", (chat_id,))
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM chats WHERE chat_id = %s", (chat_id,))
         conn.commit()
-        cur.close()
-        conn.close()
+        print(f"BAZĂ DE DATE: Utilizator {chat_id} șters.")
     except Exception as e:
-        print(f"Eroare la ștergerea chat-ului: {e}")
+        print(f"EROARE BAZĂ DE DATE: Ștergerea chat-ului {chat_id} a eșuat. Detalii: {e}")
+    finally:
+        conn.close()
 
-# --- RUTE FLASK ---
+# --- RUTE FLASK (Fără modificări aici) ---
 @app.route('/')
 def home():
-    """Pagină principală pentru a verifica dacă botul rulează."""
     return "Bot is running!"
 
 @app.route(f'/webhook/{TOKEN}', methods=['POST'])
 def webhook():
-    """Gestionează mesajele primite de la utilizatori (prin webhook Telegram)."""
     data = request.get_json()
     if "message" in data:
         chat_id = data["message"]["chat"]["id"]
@@ -123,56 +129,50 @@ def webhook():
             remove_chat(chat_id)
             reply = "Ai oprit notificările automate!"
         else:
-            reply = f"Comandă necunoscută. Folosește /start sau /stop."
+            reply = "Comandă necunoscută. Folosește /start sau /stop."
             
-        payload = { "chat_id": chat_id, "text": reply }
-        requests.post(TELEGRAM_API_URL, json=payload)
+        requests.post(TELEGRAM_API_URL, json={"chat_id": chat_id, "text": reply})
     return "ok", 200
 
 @app.route('/spam')
 def spam():
-    """Trimite un mesaj cu imagine și buton tuturor utilizatorilor activi, în mod ciclic."""
     global spam_counter
-
     if not MESAJE:
-        return "Eroare: Niciun mesaj încărcat. Verifică fișierul messages.json.", 500
-    
-    # Selectează mesajul curent din ciclu
-    mesaj_index = spam_counter % len(MESAJE)
-    mesaj_obj = MESAJE[mesaj_index]
-    
-    # Extrage datele din obiectul JSON
-    mesaj_text = mesaj_obj['text']
-    cale_imagine = mesaj_obj['imagine']
-    button_text = mesaj_obj.get("button_text", "Apasă aici")
-    button_url = mesaj_obj.get("button_url", "https://www.google.com/")
-    
-    # Incrementăm contorul pentru următoarea cerere
-    spam_counter += 1
+        return "Eroare: Niciun mesaj încărcat.", 500
     
     chats = load_chats()
-
+    if not chats:
+        return "Niciun utilizator în baza de date. Trimite /start pentru a te abona.", 200
+        
+    mesaj_obj = MESAJE[spam_counter % len(MESAJE)]
+    spam_counter += 1
+    
+    cale_imagine = mesaj_obj['imagine']
     if not os.path.exists(cale_imagine):
-        return f"Eroare: Fișierul imagine nu a fost găsit la calea {cale_imagine}", 500
+        return f"Eroare: Fișierul imagine '{cale_imagine}' nu a fost găsit.", 500
 
-    # Construim butonul inline
-    reply_markup = { "inline_keyboard": [[ { "text": button_text, "url": button_url } ]] }
+    reply_markup = {"inline_keyboard": [[{"text": mesaj_obj.get("button_text", "Apasă"), "url": mesaj_obj.get("button_url", "https://google.com")}]]}
 
-    # Trimitem mesajul fiecărui utilizator din baza de date
     for chat_id in chats:
         payload = {
             "chat_id": chat_id,
-            "caption": mesaj_text,
+            "caption": mesaj_obj['text'],
             "reply_markup": json.dumps(reply_markup)
         }
-        with open(cale_imagine, 'rb') as photo_file:
-            files = {'photo': photo_file}
-            requests.post(TELEGRAM_API_URL_PHOTO, data=payload, files=files)
+        try:
+            with open(cale_imagine, 'rb') as photo_file:
+                files = {'photo': photo_file}
+                requests.post(TELEGRAM_API_URL_PHOTO, data=payload, files=files)
+        except Exception as e:
+            print(f"EROARE la trimiterea mesajului către {chat_id}. Detalii: {e}")
             
-    return f"Mesaj trimis către {len(chats)} utilizatori.", 200
+    return f"Mesaj trimis cu succes către {len(chats)} utilizatori.", 200
+
+# --- INIȚIALIZARE ---
+# Se execută o singură dată când Render pornește aplicația
+init_db()
 
 if __name__ == "__main__":
-    # Inițializează tabelul în baza de date la pornirea aplicației
-    init_db() 
+    # Acest bloc este folosit doar pentru testare locală
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
