@@ -3,6 +3,7 @@ import requests
 import os
 import sqlite3
 import random
+import json
 
 app = Flask(__name__)
 
@@ -110,7 +111,7 @@ def webhook():
 
 @app.route('/spam')
 def spam():
-    """Trimite un mesaj cu imagine tuturor utilizatorilor activi, în mod ciclic."""
+    """Trimite un mesaj cu imagine și buton tuturor utilizatorilor activi, în mod ciclic."""
     global spam_counter
     init_db()
     
@@ -129,17 +130,25 @@ def spam():
     if not os.path.exists(cale_imagine):
         return f"Error: Image file not found at {cale_imagine}", 500
 
+    # Creăm structura pentru butonul de tip inline
+    reply_markup = {
+        "inline_keyboard": [[
+            {"text": "Play Now", "url": "https://www.google.com/"}
+        ]]
+    }
+
     for chat_id in chats:
         payload = {
             "chat_id": chat_id,
-            "caption": mesaj_text  # Pentru poze, textul se trimite ca 'caption'
+            "caption": mesaj_text,
+            "reply_markup": json.dumps(reply_markup)  # Adăugăm butonul la payload
         }
         # Deschidem fișierul imagine în mod binar și îl trimitem
         with open(cale_imagine, 'rb') as photo_file:
             files = {'photo': photo_file}
             requests.post(TELEGRAM_API_URL_PHOTO, data=payload, files=files)
             
-    return f"Sent message '{mesaj_text}' with image '{cale_imagine}' to {len(chats)} users.", 200
+    return f"Sent message '{mesaj_text}' with image '{cale_imagine}' and a button to {len(chats)} users.", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
