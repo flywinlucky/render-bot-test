@@ -175,4 +175,3 @@ init_db()
 if __name__ == "__main__":
     # Acest bloc este folosit doar pentru testare locală
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
