@@ -9,28 +9,29 @@ app = Flask(__name__)
 
 # --- CONFIGURARE ---
 TOKEN = os.getenv("BOT_TOKEN")
-# Am adăugat un URL specific pentru trimiterea de fotografii
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 TELEGRAM_API_URL_PHOTO = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
 DB_FILE = "active_chats.db"
 
-# --- LISTA DE MESAJE ȘI IMAGINI ---
-# Fiecare element este acum un dicționar cu text și calea către imaginea corespunzătoare.
-MESAJE = [
-    {'text': "Salut! Acesta este un mesaj automat de la botul tău prietenos.", 'imagine': "Creatives/Creo_1.jpg"},
-    {'text': "Bună! Sper că ai o zi productivă și plină de succes.", 'imagine': "Creatives/Creo_1.jpg"},
-    {'text': "Notificare: A trecut încă un minut. Timpul zboară când te distrezi!", 'imagine': "Creatives/Creo_1.jpg"},
-    {'text': "Acesta este un memento automat pentru a-ți aminti să faci o pauză.", 'imagine': "Creatives/Creo_1.jpg"},
-    {'text': "Ce mai faci? Botul tău se gândește la tine.", 'imagine': "Creatives/Creo_1.jpg"},
-    {'text': "Ping! Doar verificam dacă ești pe fază. O zi bună!", 'imagine': "Creatives/Creo_1.jpg"},
-    {'text': "O mică notificare pentru a-ți aduce un zâmbet pe buze.", 'imagine': "Creatives/Creo_1.jpg"},
-    {'text': "Mesaj automat: Sistemele funcționează în parametri normali.", 'imagine': "Creatives/Creo_1.jpg"},
-    {'text': "Știai că roboții nu dorm niciodată? Sunt mereu aici pentru tine!", 'imagine': "Creatives/Creo_1.jpg"},
-    {'text': "Acesta este ultimul mesaj unic din ciclu. Următorul o va lua de la capăt!", 'imagine': "Creatives/Creo_1.jpg"}
-]
+# --- ÎNCĂRCARE MESAJE DIN FIȘIERUL JSON ---
+def load_messages():
+    """Încarcă mesajele din fișierul messages.json."""
+    try:
+        with open('messages.json', 'r', encoding='utf-8') as f:
+            messages = json.load(f)
+        return messages
+    except FileNotFoundError:
+        print("Eroare: Fișierul 'messages.json' nu a fost găsit.")
+        return []
+    except json.JSONDecodeError:
+        print("Eroare: Fișierul 'messages.json' nu este un JSON valid.")
+        return []
 
-# Amestecăm lista o singură dată la pornirea aplicației.
-random.shuffle(MESAJE)
+MESAJE = load_messages()
+
+# Amestecăm lista o singură dată la pornirea aplicației, dacă a fost încărcată corect.
+if MESAJE:
+    random.shuffle(MESAJE)
 
 # Contor global pentru a urmări ce mesaj a fost trimis
 spam_counter = 0
@@ -114,12 +115,20 @@ def spam():
     """Trimite un mesaj cu imagine și buton tuturor utilizatorilor activi, în mod ciclic."""
     global spam_counter
     init_db()
+
+    if not MESAJE:
+        return "Error: No messages loaded. Check messages.json file.", 500
     
     # Selectează perechea de mesaj și imagine folosind contorul global
     mesaj_index = spam_counter % len(MESAJE)
     mesaj_obj = MESAJE[mesaj_index]
     mesaj_text = mesaj_obj['text']
     cale_imagine = mesaj_obj['imagine']
+    
+    # Extragem textul și URL-ul butonului din obiectul mesajului
+    # Folosim valori implicite în caz că nu sunt definite în JSON
+    button_text = mesaj_obj.get("button_text", "Apasă aici")
+    button_url = mesaj_obj.get("button_url", "https://www.google.com/")
     
     # Incrementăm contorul pentru următoarea cerere
     spam_counter += 1
@@ -130,10 +139,10 @@ def spam():
     if not os.path.exists(cale_imagine):
         return f"Error: Image file not found at {cale_imagine}", 500
 
-    # Creăm structura pentru butonul de tip inline
+    # Creăm structura pentru butonul de tip inline folosind datele dinamice
     reply_markup = {
         "inline_keyboard": [[
-            {"text": "Play Now", "url": "https://www.google.com/"}
+            {"text": button_text, "url": button_url}
         ]]
     }
 
@@ -141,7 +150,7 @@ def spam():
         payload = {
             "chat_id": chat_id,
             "caption": mesaj_text,
-            "reply_markup": json.dumps(reply_markup)  # Adăugăm butonul la payload
+            "reply_markup": json.dumps(reply_markup)
         }
         # Deschidem fișierul imagine în mod binar și îl trimitem
         with open(cale_imagine, 'rb') as photo_file:

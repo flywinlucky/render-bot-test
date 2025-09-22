@@ -1,0 +1,63 @@
+[
+    {
+        "text": "Salut! Acesta este un mesaj automat de la botul tău prietenos.",
+        "imagine": "Creatives/Creo_1.jpg",
+        "button_text": "Vezi Noutăți",
+        "button_url": "https://www.google.com/search?q=noutati"
+    },
+    {
+        "text": "Bună! Sper că ai o zi productivă și plină de succes.",
+        "imagine": "Creatives/Creo_2.jpg",
+        "button_text": "Inspiră-te",
+        "button_url": "https://www.pinterest.com/"
+    },
+    {
+        "text": "Notificare: A trecut încă un minut. Timpul zboară când te distrezi!",
+        "imagine": "Creatives/Creo_3.jpg",
+        "button_text": "Play Now",
+        "button_url": "https://www.google.com/"
+    },
+    {
+        "text": "Acesta este un memento automat pentru a-ți aminti să faci o pauză.",
+        "imagine": "Creatives/Creo_4.jpg",
+        "button_text": "Relaxează-te",
+        "button_url": "https://www.youtube.com/watch?v=lTRiuFIWV54"
+    },
+    {
+        "text": "Ce mai faci? Botul tău se gândește la tine.",
+        "imagine": "Creatives/Creo_5.jpg",
+        "button_text": "Deschide URL",
+        "button_url": "https://www.wikipedia.org/"
+    },
+    {
+        "text": "Ping! Doar verificam dacă ești pe fază. O zi bună!",
+        "imagine": "Creatives/Creo_6.jpg",
+        "button_text": "Află mai multe",
+        "button_url": "https://www.google.com/"
+    },
+    {
+        "text": "O mică notificare pentru a-ți aduce un zâmbet pe buze.",
+        "imagine": "Creatives/Creo_7.jpg",
+        "button_text": "Zâmbește!",
+        "button_url": "https://www.google.com/search?q=funny+cats"
+    },
+    {
+        "text": "Mesaj automat: Sistemele funcționează în parametri normali.",
+        "imagine": "Creatives/Creo_8.jpg",
+        "button_text": "Verifică Status",
+        "button_url": "https://www.google.com/"
+    },
+    {
+        "text": "Știai că roboții nu dorm niciodată? Sunt mereu aici pentru tine!",
+        "imagine": "Creatives/Creo_9.jpg",
+        "button_text": "Citește Curiozități",
+        "button_url": "https://www.google.com/search?q=curiozitati"
+    },
+    {
+        "text": "Acesta este ultimul mesaj unic din ciclu. Următorul o va lua de la capăt!",
+        "imagine": "Creatives/Creo_10.jpg",
+        "button_text": "Restart",
+        "button_url": "https://www.google.com/"
+    }
+]
+
