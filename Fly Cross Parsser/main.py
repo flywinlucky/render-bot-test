@@ -1,5 +1,5 @@
 # telegram_bot_scraper_bot_simple.py
-# Telegram bot: fetch Puma product info and images; send each section in separate monospace blocks
+# Telegram bot: preia informații despre produse Puma Moldova și imagini; trimite fiecare secțiune în blocuri monospace
 
 import os
 import re
@@ -11,17 +11,17 @@ import telebot
 from telebot import types
 from html import escape
 
-# === BOT CONFIGURATION ===
+# === CONFIGURARE BOT ===
 TOKEN = "8423056299:AAEPgP1bsEWx9SFHlAeTu5cHxB0hi4oh_fk"
 bot = telebot.TeleBot(TOKEN)
 
-# === HEADERS & BASE URL ===
+# === HEADERE & URL DE BAZĂ ===
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
 }
 base_url = "https://pumamoldova.md"
 
-# === UTILITY FUNCTIONS ===
+# === FUNCȚII UTILE ===
 
 def clean_folder_name(name):
     name = name.replace(' ', '_')
@@ -30,17 +30,16 @@ def clean_folder_name(name):
 
 def detect_gender(url):
     url_lower = url.lower()
-    # Detect gender or category from URL
     if 'female' in url_lower:
-        return 'Female'
+        return 'Femeie'
     elif 'male' in url_lower:
-        return 'Male'
+        return 'Bărbat'
     elif 'unisex' in url_lower:
         return 'Unisex'
     elif 'boys' in url_lower:
-        return 'Boys'
+        return 'Băieți'
     elif 'girls' in url_lower:
-        return 'Girls'
+        return 'Fete'
     else:
         return 'Unisex'
 
@@ -52,7 +51,7 @@ def progress_bar(bot, chat_id, step, total, message_id=None):
     progress = int((step / total) * bar_length)
     bar = '█' * progress + '░' * (bar_length - progress)
     percent = int((step / total) * 100)
-    text = f"Processing images... {bar} {percent}%"
+    text = f"Se procesează imaginile... {bar} {percent}%"
     if message_id:
         try:
             bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text)
@@ -62,7 +61,7 @@ def progress_bar(bot, chat_id, step, total, message_id=None):
         return bot.send_message(chat_id, text)
 
 
-# === SCRAPING FUNCTION ===
+# === FUNCȚIE DE SCRAPING ===
 
 def scrape_and_send(chat_id, url):
     try:
@@ -110,9 +109,9 @@ def scrape_and_send(chat_id, url):
 
         gender = detect_gender(url)
 
-        summary_lines = [f"Price: {price}", f"Sizes: {size_text}", f"Gender: {gender}"]
+        summary_lines = [f"Preț: {price}", f"Mărimi: {size_text}", f"Gen: {gender}"]
         if len(color_data) > 1 or color_data[0]['name'] != 'default':
-            summary_lines.append(f"Colors: {', '.join([c['name'] for c in color_data])}")
+            summary_lines.append(f"Culori: {', '.join([c['name'] for c in color_data])}")
         summary_text = "\n".join(summary_lines)
         bot.send_message(chat_id, f"<pre>{escape(summary_text)}</pre>", parse_mode='HTML')
 
@@ -120,11 +119,11 @@ def scrape_and_send(chat_id, url):
             bot.send_message(chat_id, f"<pre>{escape(desc_main)}</pre>", parse_mode='HTML')
 
         if features:
-            features_block = f"Features:\n\n{features}"
+            features_block = f"Caracteristici:\n\n{features}"
             bot.send_message(chat_id, f"<pre>{escape(features_block)}</pre>", parse_mode='HTML')
 
         if materials:
-            materials_block = f"Materials:\n\n{materials}"
+            materials_block = f"Materiale:\n\n{materials}"
             bot.send_message(chat_id, f"<pre>{escape(materials_block)}</pre>", parse_mode='HTML')
 
         total_colors = len(color_data)
@@ -148,61 +147,61 @@ def scrape_and_send(chat_id, url):
                         continue
                     img_bytes = requests.get(link_image, headers=headers, timeout=15).content
                     bio = io.BytesIO(img_bytes)
-                    bio.name = f"image_{idx}.jpg"
+                    bio.name = f"imagine_{idx}.jpg"
                     media.append(telebot.types.InputMediaPhoto(bio))
 
                 if media:
                     bot.send_media_group(chat_id, media)
 
             except Exception as e:
-                bot.send_message(chat_id, f"Error loading color {color_name}: {e}")
+                bot.send_message(chat_id, f"Eroare la încărcarea culorii {color_name}: {e}")
 
             progress_bar(bot, chat_id, i, total_colors, progress_msg.message_id if progress_msg else None)
 
-        bot.send_message(chat_id, f"Product '{product_name}' processed successfully.")
+        bot.send_message(chat_id, f"Produsul '{product_name}' a fost procesat cu succes.")
 
     except Exception as e:
-        bot.send_message(chat_id, f"Error: {e}")
+        bot.send_message(chat_id, f"Eroare: {e}")
 
 
-# === TELEGRAM HANDLERS ===
+# === HANDLERE TELEGRAM ===
 @bot.message_handler(commands=['start'])
 def start_message(message):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    btn1 = types.KeyboardButton('Send Product Link')
-    btn2 = types.KeyboardButton('Info')
+    btn1 = types.KeyboardButton('Trimite link produs')
+    btn2 = types.KeyboardButton('Informații')
     markup.add(btn1, btn2)
     bot.send_message(
         message.chat.id,
-        "Welcome to Puma Moldova Scraper Bot\n\nUse the buttons below to start.",
+        "Bun venit la Bot-ul Puma Moldova!\n\nFolosește butoanele de mai jos pentru a începe.",
         reply_markup=markup
     )
 
 
-@bot.message_handler(func=lambda m: m.text == 'Info')
+@bot.message_handler(func=lambda m: m.text == 'Informații')
 def help_message(message):
     help_text = (
-        "How to use:\n\n"
-        "1. Press 'Send Product Link' and paste a Puma Moldova product URL.\n"
-        "2. Wait while I fetch details and images.\n"
-        "3. Watch the progress bar.\n"
-        "4. Each section (description, features, materials) is sent separately in monospace format."
+        "Cum se folosește:\n\n"
+        "1. Apasă 'Trimite link produs' și trimite URL-ul unui produs Puma Moldova.\n"
+        "2. Așteaptă să preiau detaliile și imaginile.\n"
+        "3. Urmărește bara de progres.\n"
+        "4. Fiecare secțiune (descriere, caracteristici, materiale) este trimisă separat în format monospace."
     )
     bot.send_message(message.chat.id, help_text)
 
 
-@bot.message_handler(func=lambda m: m.text == 'Send Product Link')
+@bot.message_handler(func=lambda m: m.text == 'Trimite link produs')
 def request_link(message):
-    bot.send_message(message.chat.id, "Please send the Puma product link (e.g. https://pumamoldova.md/... )\n\nGender will be auto-detected from the link (male, female, unisex, boys, or girls).")
+    bot.send_message(message.chat.id, "Te rog trimite link-ul produsului Puma (ex: https://pumamoldova.md/... )\n\nGenul va fi detectat automat din link (Bărbat, Femeie, Unisex, Băieți sau Fete).")
 
 
 @bot.message_handler(func=lambda m: m.text.startswith('http'))
 def process_link(message):
     url = message.text.strip()
-    bot.reply_to(message, "Processing your request, please wait...")
+    bot.reply_to(message, "Se procesează cererea ta, te rog așteaptă...")
     scrape_and_send(message.chat.id, url)
 
 
 if __name__ == '__main__':
-    print("PUMA Product Info Bot is now running locally. Press Ctrl+C to stop.")
+    print("Bot-ul Puma Moldova rulează local. Apasă Ctrl+C pentru a opri.")
     bot.infinity_polling()
