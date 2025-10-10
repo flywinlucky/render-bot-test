@@ -100,12 +100,16 @@ def scrape_and_send(chat_id, url):
             color_data.append({'name': 'default', 'url': url})
 
         description_full_tag = soup.find('div', id='fullDescription')
-        description_full = description_full_tag.get_text(separator='\n', strip=True) if description_full_tag else ''
+        description_full = description_full_tag.get_text(separator=' ', strip=True) if description_full_tag else ''
 
+        # Eliminăm textul 'о товаре' și păstrăm doar conținutul
+        description_full = re.sub(r'^о товаре\s*', '', description_full, flags=re.IGNORECASE)
+
+        # Separăm textul descriptiv de caracteristici și materiale
         desc_parts = re.split(r'Характеристики:|Материалы:', description_full)
-        desc_main = desc_parts[0].strip() if len(desc_parts) >= 1 else ''
-        features = desc_parts[1].strip() if len(desc_parts) > 1 else ''
-        materials = desc_parts[2].strip() if len(desc_parts) > 2 else ''
+        desc_main = ' '.join(desc_parts[0].split()) if len(desc_parts) >= 1 else ''  # toate liniile la un loc
+        features = ' '.join(desc_parts[1].split()) if len(desc_parts) > 1 else ''
+        materials = ' '.join(desc_parts[2].split()) if len(desc_parts) > 2 else ''
 
         gender = detect_gender(url)
 
@@ -116,7 +120,8 @@ def scrape_and_send(chat_id, url):
         bot.send_message(chat_id, f"<pre>{escape(summary_text)}</pre>", parse_mode='HTML')
 
         if desc_main:
-            bot.send_message(chat_id, f"<pre>{escape(desc_main)}</pre>", parse_mode='HTML')
+            desc_block = f"Descriere produs:\n\n{desc_main}"
+            bot.send_message(chat_id, f"<pre>{escape(desc_block)}</pre>", parse_mode='HTML')
 
         if features:
             features_block = f"Caracteristici:\n\n{features}"
@@ -158,7 +163,7 @@ def scrape_and_send(chat_id, url):
 
             progress_bar(bot, chat_id, i, total_colors, progress_msg.message_id if progress_msg else None)
 
-        bot.send_message(chat_id, f"Produsul '{product_name}' a fost procesat cu succes.")
+        bot.send_message(chat_id, f"Produsul '{product_name}' a fost procesat cu succes. ✅")
 
     except Exception as e:
         bot.send_message(chat_id, f"Eroare: {e}")
@@ -192,7 +197,7 @@ def help_message(message):
 
 @bot.message_handler(func=lambda m: m.text == 'Trimite link produs')
 def request_link(message):
-    bot.send_message(message.chat.id, "Te rog trimite link-ul produsului Puma (ex: https://pumamoldova.md/... )\n\nGenul va fi detectat automat din link (Bărbat, Femeie, Unisex, Băieți sau Fete).")
+    bot.send_message(message.chat.id, "Te rog trimite link-ul produsului Puma (ex: https://pumamoldova.md/...)\n\nGenul va fi detectat automat din link (Bărbat, Femeie, Unisex, Băieți sau Fete).")
 
 
 @bot.message_handler(func=lambda m: m.text.startswith('http'))
