@@ -49,9 +49,9 @@ def progress_bar(bot, chat_id, step, total, message_id=None):
         total = 1
     bar_length = 10
     progress = int((step / total) * bar_length)
-    bar = '█' * progress + '░' * (bar_length - progress)
+    bar = '🟩' * progress + '⬜' * (bar_length - progress)
     percent = int((step / total) * 100)
-    text = f"Se procesează imaginile... {bar} {percent}%"
+    text = f"🔄 Se procesează imaginile... {bar} {percent}%"
     if message_id:
         try:
             bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text)
@@ -65,6 +65,10 @@ def progress_bar(bot, chat_id, step, total, message_id=None):
 
 def scrape_and_send(chat_id, url):
     try:
+        if not url.startswith(base_url):
+            bot.send_message(chat_id, "⚠️ Link invalid! Te rog introdu un link de pe https://pumamoldova.md")
+            return
+
         bot.send_chat_action(chat_id, 'typing')
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
@@ -101,13 +105,10 @@ def scrape_and_send(chat_id, url):
 
         description_full_tag = soup.find('div', id='fullDescription')
         description_full = description_full_tag.get_text(separator=' ', strip=True) if description_full_tag else ''
-
-        # Eliminăm textul 'о товаре' și păstrăm doar conținutul
         description_full = re.sub(r'^о товаре\s*', '', description_full, flags=re.IGNORECASE)
 
-        # Separăm textul descriptiv de caracteristici și materiale
         desc_parts = re.split(r'Характеристики:|Материалы:', description_full)
-        desc_main = ' '.join(desc_parts[0].split()) if len(desc_parts) >= 1 else ''  # toate liniile la un loc
+        desc_main = ' '.join(desc_parts[0].split()) if len(desc_parts) >= 1 else ''
         features = ' '.join(desc_parts[1].split()) if len(desc_parts) > 1 else ''
         materials = ' '.join(desc_parts[2].split()) if len(desc_parts) > 2 else ''
 
@@ -159,14 +160,14 @@ def scrape_and_send(chat_id, url):
                     bot.send_media_group(chat_id, media)
 
             except Exception as e:
-                bot.send_message(chat_id, f"Eroare la încărcarea culorii {color_name}: {e}")
+                bot.send_message(chat_id, f"⚠️ Eroare la încărcarea culorii {color_name}: {e}")
 
             progress_bar(bot, chat_id, i, total_colors, progress_msg.message_id if progress_msg else None)
 
-        bot.send_message(chat_id, f"Produsul '{product_name}' a fost procesat cu succes. ✅")
+        bot.send_message(chat_id, f"✅ Produsul '{product_name}' a fost procesat cu succes!")
 
     except Exception as e:
-        bot.send_message(chat_id, f"Eroare: {e}")
+        bot.send_message(chat_id, f"❌ Eroare: {e}\n💡 Încearcă din nou sau verifică link-ul.")
 
 
 # === HANDLERE TELEGRAM ===
@@ -178,33 +179,44 @@ def start_message(message):
     markup.add(btn1, btn2)
     bot.send_message(
         message.chat.id,
-        "Bun venit la Bot-ul Puma Moldova!\n\nFolosește butoanele de mai jos pentru a începe.",
+        "👋 Bun venit la Bot-ul Puma Moldova!\n\nFolosește butoanele de mai jos pentru a începe.",
         reply_markup=markup
     )
 
 
 @bot.message_handler(func=lambda m: m.text == 'Informații')
 def help_message(message):
-    help_text = (
-        "Cum se folosește:\n\n"
-        "1. Apasă 'Trimite link produs' și trimite URL-ul unui produs Puma Moldova.\n"
-        "2. Așteaptă să preiau detaliile și imaginile.\n"
-        "3. Urmărește bara de progres.\n"
-        "4. Fiecare secțiune (descriere, caracteristici, materiale) este trimisă separat în format monospace."
-    )
-    bot.send_message(message.chat.id, help_text)
+    if message.text.strip() == 'Informații':
+        help_text = (
+            "ℹ️ Cum se folosește:\n\n"
+            "1️⃣ Apasă 'Trimite link produs' și trimite URL-ul unui produs Puma Moldova.\n"
+            "2️⃣ Așteaptă să preiau detaliile și imaginile.\n"
+            "3️⃣ Urmărește bara de progres.\n"
+            "4️⃣ Fiecare secțiune (descriere, caracteristici, materiale) este trimisă separat în format monospace."
+        )
+        bot.send_message(message.chat.id, help_text)
 
 
 @bot.message_handler(func=lambda m: m.text == 'Trimite link produs')
 def request_link(message):
-    bot.send_message(message.chat.id, "Te rog trimite link-ul produsului Puma (ex: https://pumamoldova.md/...)\n\nGenul va fi detectat automat din link (Bărbat, Femeie, Unisex, Băieți sau Fete).")
+    if message.text.strip() == 'Trimite link produs':
+        bot.send_message(message.chat.id, "📎 Te rog trimite link-ul produsului Puma (ex: https://pumamoldova.md/...)\n\nGenul va fi detectat automat din link (Bărbat, Femeie, Unisex, Băieți sau Fete).")
 
 
 @bot.message_handler(func=lambda m: m.text.startswith('http'))
 def process_link(message):
     url = message.text.strip()
-    bot.reply_to(message, "Se procesează cererea ta, te rog așteaptă...")
+    if not url.startswith(base_url):
+        bot.send_message(message.chat.id, "⚠️ Link invalid! Te rog introdu un link corect de pe site-ul Puma Moldova.")
+        return
+    bot.reply_to(message, "⏳ Se procesează cererea ta, te rog așteaptă...")
     scrape_and_send(message.chat.id, url)
+
+
+@bot.message_handler(func=lambda m: True)
+def unknown_command(message):
+    if message.text not in ['Trimite link produs', 'Informații'] and not message.text.startswith('http'):
+        bot.send_message(message.chat.id, "⚠️ Comandă necunoscută! Încearcă din nou folosind butoanele disponibile sau trimite un link valid de produs.")
 
 
 if __name__ == '__main__':
